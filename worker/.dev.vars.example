@@ -1,0 +1,4 @@
+MS_CLIENT_ID=your-azure-client-id
+MS_CLIENT_SECRET=your-azure-client-secret
+TOKEN_ENCRYPTION_KEY=base64-encoded-32-byte-key
+ALLOWED_ORIGIN=https://localhost:3000

@@ -1,0 +1,18 @@
+{
+  "name": "@letterbox/worker",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --ip 0.0.0.0 --port 8787 --local-protocol https --https-key-path ../certs/key.pem --https-cert-path ../certs/cert.pem",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "itty-router": "^5.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250313.0",
+    "wrangler": "^4.0.0"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "letterbox-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-12-01",
+  "kv_namespaces": [
+    {
+      "binding": "SESSIONS",
+      "id": "4bbbeb8ce9d141f5abd0ad682922f1cb"
+    }
+  ]
+  // Secrets (set via `wrangler secret put`):
+  // - MS_CLIENT_ID
+  // - MS_CLIENT_SECRET
+  // - TOKEN_ENCRYPTION_KEY
+  // - COOKIE_SECRET
+}
