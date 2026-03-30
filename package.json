@@ -5,7 +5,7 @@
     "dev": "concurrently \"pnpm --filter worker dev\" \"pnpm --filter web dev\"",
     "dev:worker": "pnpm --filter worker dev",
     "dev:web": "pnpm --filter web dev",
-    "build": "pnpm --filter shared build && pnpm --filter worker build && pnpm --filter web build",
+    "build": "pnpm --filter web build",
     "deploy:worker": "pnpm --filter worker deploy",
     "deploy:web": "pnpm --filter web deploy",
     "typecheck": "pnpm -r typecheck"

@@ -1,7 +1,11 @@
 {
-  "name": "letterbox-api",
+  "name": "letterbox",
   "main": "src/index.ts",
   "compatibility_date": "2025-12-01",
+  "assets": {
+    "directory": "../web/dist",
+    "not_found_handling": "single-page-application"
+  },
   "kv_namespaces": [
     {
       "binding": "SESSIONS",
@@ -12,5 +16,4 @@
   // - MS_CLIENT_ID
   // - MS_CLIENT_SECRET
   // - TOKEN_ENCRYPTION_KEY
-  // - COOKIE_SECRET
 }
