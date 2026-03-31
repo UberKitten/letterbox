@@ -6,8 +6,7 @@
     "dev:worker": "pnpm --filter worker dev",
     "dev:web": "pnpm --filter web dev",
     "build": "pnpm --filter web build",
-    "deploy:worker": "pnpm --filter worker deploy",
-    "deploy:web": "pnpm --filter web deploy",
+    "deploy": "pnpm --filter worker deploy",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {

@@ -52,3 +52,58 @@ export function sanitizeEmailHtml(html: string): string {
 
   return div.innerHTML;
 }
+
+// Check if a CSS color value is "light" (would be invisible on dark background)
+function isLightColor(color: string): boolean {
+  const el = document.createElement("div");
+  el.style.color = color;
+  document.body.appendChild(el);
+  const computed = getComputedStyle(el).color;
+  document.body.removeChild(el);
+
+  const match = computed.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!match) return false;
+  const [, r, g, b] = match.map(Number);
+  // Perceived luminance — values above ~140 are "light"
+  const luminance = r * 0.299 + g * 0.587 + b * 0.114;
+  return luminance > 140;
+}
+
+// Strip inline light colors/backgrounds for dark mode rendering
+export function darkModeTransform(html: string): string {
+  const div = document.createElement("div");
+  div.innerHTML = html;
+
+  div.querySelectorAll("[style]").forEach((el) => {
+    const style = (el as HTMLElement).style;
+    // Strip light background colors
+    if (style.backgroundColor) {
+      if (isLightColor(style.backgroundColor)) {
+        style.backgroundColor = "transparent";
+      }
+    }
+    if (style.background) {
+      // background shorthand — strip if it's just a light color
+      const bg = style.background;
+      if (/^#[0-9a-f]{3,8}$/i.test(bg.trim()) || /^rgb/i.test(bg.trim())) {
+        if (isLightColor(bg)) {
+          style.background = "transparent";
+        }
+      }
+    }
+    // Strip dark text colors (they'd be invisible on dark bg)
+    if (style.color && !isLightColor(style.color)) {
+      style.color = "";
+    }
+  });
+
+  // Strip bgcolor HTML attributes
+  div.querySelectorAll("[bgcolor]").forEach((el) => {
+    const bgcolor = el.getAttribute("bgcolor") || "";
+    if (isLightColor(bgcolor)) {
+      el.removeAttribute("bgcolor");
+    }
+  });
+
+  return div.innerHTML;
+}

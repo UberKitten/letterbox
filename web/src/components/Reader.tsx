@@ -1,4 +1,5 @@
 import {
+  For,
   Show,
   createEffect,
   createMemo,
@@ -15,9 +16,9 @@ import {
   logout as apiLogout,
   type MessagePage,
 } from "../api";
-import type { FolderInfo, EmailMessage } from "@letterbox/shared";
-import { Menu } from "lucide-solid";
-import FilterBar from "./FilterBar";
+import type { FolderInfo, EmailMessage, StatusFilter } from "@letterbox/shared";
+import { Menu, Sparkles, ChevronDown, ChevronUp, Settings, X, Sun, Moon, Minimize2, Maximize2, Flag } from "lucide-solid";
+import { summarizeEmail, htmlToText } from "../lib/openai";
 import FolderPicker from "./FolderPicker";
 import ArticleBody from "./ArticleBody";
 import ArticleOriginal from "./ArticleOriginal";
@@ -70,6 +71,13 @@ function useSystemDark(): () => boolean {
   return dark;
 }
 
+const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
+  { value: "unread", label: "Unread" },
+  { value: "read", label: "Read" },
+  { value: "flagged", label: "Flagged" },
+  { value: "all", label: "All" },
+];
+
 export default function Reader() {
   const systemDark = useSystemDark();
   const articleThemeClass = createMemo(() => {
@@ -79,7 +87,19 @@ export default function Reader() {
     return systemDark() ? "article-dark" : "article-light";
   });
 
+  let containerRef: HTMLDivElement | undefined;
+  const scrollPositions = new Map<string, number>(); // messageId -> scrollTop
+
   const [userMenuOpen, setUserMenuOpen] = createSignal(false);
+  const [filterDropdownOpen, setFilterDropdownOpen] = createSignal(false);
+  const [headerVisible, setHeaderVisible] = createSignal(true);
+  let lastScrollY = 0;
+  const [settingsOpen, setSettingsOpen] = createSignal(false);
+  const [summary, setSummary] = createSignal<string | null>(null);
+  const [summaryOpen, setSummaryOpen] = createSignal(true);
+  const [summarizing, setSummarizing] = createSignal(false);
+  const [summaryError, setSummaryError] = createSignal<string | null>(null);
+  let summaryMessageId = ""; // track which message the summary is for
   const [articleKey, setArticleKey] = createSignal(0);
   const [undoMessage, setUndoMessage] = createSignal<EmailMessage | null>(null);
   let fetchGeneration = 0;
@@ -118,8 +138,24 @@ export default function Reader() {
     ),
   );
 
+  function saveScrollPosition() {
+    const msgId = store.currentMessage()?.id;
+    if (msgId) {
+      const scrollTop = containerRef?.scrollTop || window.scrollY || document.documentElement.scrollTop;
+      scrollPositions.set(msgId, scrollTop);
+    }
+  }
+
+  function restoreScrollPosition(msgId: string) {
+    const saved = scrollPositions.get(msgId) ?? 0;
+    // Reset both — whichever is actually scrolling
+    if (containerRef) containerRef.scrollTop = saved;
+    window.scrollTo(0, saved);
+  }
+
   // Show a message from cache instantly, or fetch if missing
   async function showMessage(index: number) {
+    saveScrollPosition();
     const key = currentCacheKey();
     if (key !== cacheKey) invalidateCache();
 
@@ -128,6 +164,7 @@ export default function Reader() {
       store.setCurrentMessage(cached);
       setArticleKey((k) => k + 1);
       store.setLoading(false);
+      restoreScrollPosition(cached.id);
       return;
     }
 
@@ -154,8 +191,10 @@ export default function Reader() {
       storePage(res);
       const ft = folderTotal();
       store.setTotalCount(ft != null ? ft : res.totalCount);
-      store.setCurrentMessage(res.messages[0] || null);
+      const firstMsg = res.messages[0] || null;
+      store.setCurrentMessage(firstMsg);
       setArticleKey((k) => k + 1);
+      if (firstMsg) restoreScrollPosition(firstMsg.id);
     } catch (e: any) {
       if (gen !== fetchGeneration) return;
       store.setError(e.message);
@@ -262,6 +301,49 @@ export default function Reader() {
     }
   }
 
+  async function handleSummarize() {
+    const msg = store.currentMessage();
+    const key = store.openaiKey();
+    if (!msg || !key) return;
+
+    // Don't re-summarize the same message
+    if (summaryMessageId === msg.id && summary()) {
+      setSummaryOpen(true);
+      return;
+    }
+
+    setSummarizing(true);
+    setSummaryError(null);
+    setSummary(null);
+    summaryMessageId = msg.id;
+
+    try {
+      const text = htmlToText(msg.body?.content || "");
+      const result = await summarizeEmail(key, store.openaiModel(), msg.subject, text);
+      // Only apply if still on the same message
+      if (store.currentMessage()?.id === msg.id) {
+        setSummary(result);
+        setSummaryOpen(true);
+      }
+    } catch (e: any) {
+      if (store.currentMessage()?.id === msg.id) {
+        setSummaryError(e.message);
+      }
+    } finally {
+      setSummarizing(false);
+    }
+  }
+
+  // Clear summary when message changes
+  createEffect(() => {
+    const msg = store.currentMessage();
+    if (msg?.id !== summaryMessageId) {
+      setSummary(null);
+      setSummaryError(null);
+      summaryMessageId = msg?.id || "";
+    }
+  });
+
   async function handleLogout() {
     await apiLogout();
     store.setUser(null);
@@ -304,8 +386,24 @@ export default function Reader() {
     }
   }
 
-  onMount(() => document.addEventListener("keydown", onKeyDown));
-  onCleanup(() => document.removeEventListener("keydown", onKeyDown));
+  function onScroll() {
+    const y = window.scrollY;
+    if (y < lastScrollY || y <= 0) {
+      setHeaderVisible(true);
+    } else if (y > lastScrollY && y > 48) {
+      setHeaderVisible(false);
+    }
+    lastScrollY = y;
+  }
+
+  onMount(() => {
+    document.addEventListener("keydown", onKeyDown);
+    window.addEventListener("scroll", onScroll, { passive: true });
+  });
+  onCleanup(() => {
+    document.removeEventListener("keydown", onKeyDown);
+    window.removeEventListener("scroll", onScroll);
+  });
 
   const message = () => store.currentMessage();
 
@@ -324,7 +422,7 @@ export default function Reader() {
   return (
     <>
       {/* Header */}
-      <header class="header">
+      <header class={`header${headerVisible() ? "" : " header-hidden"}`}>
         <button
           class="header-btn"
           onClick={() => store.setFolderDrawerOpen(true)}
@@ -335,16 +433,69 @@ export default function Reader() {
 
         <span class="header-title">Letterbox</span>
 
+        <div class="filter-menu">
+          <button
+            class="filter-menu-btn"
+            onClick={() => {
+              setFilterDropdownOpen(!filterDropdownOpen());
+              setUserMenuOpen(false);
+            }}
+          >
+            {STATUS_FILTERS.find((f) => f.value === store.statusFilter())!.label}
+            <ChevronDown size={14} />
+          </button>
+          <Show when={filterDropdownOpen()}>
+            <div class="dropdown-overlay" onClick={() => setFilterDropdownOpen(false)} />
+            <div class="filter-dropdown">
+              <For each={STATUS_FILTERS}>
+                {(f) => (
+                  <button
+                    class={`filter-dropdown-item${store.statusFilter() === f.value ? " active" : ""}`}
+                    onClick={() => {
+                      store.setStatusFilter(f.value);
+                      store.setCurrentIndex(0);
+                      setFilterDropdownOpen(false);
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                )}
+              </For>
+              <Show when={store.categories().length > 0}>
+                <div class="filter-dropdown-divider" />
+                <div class="filter-dropdown-category">
+                  <select
+                    class="filter-select"
+                    value={store.categoryFilter() || ""}
+                    onChange={(e) => {
+                      store.setCategoryFilter(e.target.value || null);
+                      store.setCurrentIndex(0);
+                    }}
+                  >
+                    <option value="">All categories</option>
+                    <For each={store.categories()}>
+                      {(cat) => <option value={cat.displayName}>{cat.displayName}</option>}
+                    </For>
+                  </select>
+                </div>
+              </Show>
+            </div>
+          </Show>
+        </div>
+
         <div class="header-actions">
           <div class="user-menu">
             <button
               class="user-btn"
-              onClick={() => setUserMenuOpen(!userMenuOpen())}
+              onClick={() => { setUserMenuOpen(!userMenuOpen()); setFilterDropdownOpen(false); }}
             >
               {store.user()?.displayName}
             </button>
             <Show when={userMenuOpen()}>
               <div class="user-dropdown">
+                <button onClick={() => { setSettingsOpen(true); setUserMenuOpen(false); }}>
+                  <Settings size={14} /> Settings
+                </button>
                 <button onClick={handleLogout}>Sign out</button>
               </div>
             </Show>
@@ -352,16 +503,50 @@ export default function Reader() {
         </div>
       </header>
 
-      {/* Filter Bar */}
-      <FilterBar />
-
       {/* Folder Drawer */}
       <Show when={store.folderDrawerOpen()}>
         <FolderPicker />
       </Show>
 
+      {/* Settings Modal */}
+      <Show when={settingsOpen()}>
+        <div class="drawer-overlay" onClick={() => setSettingsOpen(false)} />
+        <div class="settings-modal">
+          <div class="settings-header">
+            <h2>Settings</h2>
+            <button class="header-btn" onClick={() => setSettingsOpen(false)}>
+              <X size={18} />
+            </button>
+          </div>
+          <div class="settings-body">
+            <label class="settings-label">OpenAI API Key</label>
+            <input
+              type="password"
+              class="settings-input"
+              value={store.openaiKey()}
+              onInput={(e) => store.setOpenaiKey(e.currentTarget.value)}
+              placeholder="sk-..."
+            />
+            <p class="settings-hint">Stored in your browser only. Never sent to our server.</p>
+
+            <label class="settings-label">Model</label>
+            <select
+              class="settings-input"
+              value={store.openaiModel()}
+              onChange={(e) => store.setOpenaiModel(e.currentTarget.value)}
+            >
+              <option value="gpt-4.1-mini">gpt-4.1-mini (recommended)</option>
+              <option value="gpt-4.1-nano">gpt-4.1-nano (cheapest)</option>
+              <option value="gpt-4o-mini">gpt-4o-mini</option>
+              <option value="gpt-4o">gpt-4o</option>
+              <option value="gpt-4.1">gpt-4.1</option>
+            </select>
+          </div>
+        </div>
+      </Show>
+
       {/* Main Content */}
-      <div class="reader-container">
+      <div class="reader-container" ref={containerRef}>
         <Show
           when={!store.loading()}
           fallback={
@@ -426,23 +611,91 @@ export default function Reader() {
                         <span class="article-meta-dot">&middot;</span>
                         <span>{msg().categories.join(", ")}</span>
                       </Show>
+                      <Show when={msg().flag?.flagStatus === "flagged"}>
+                        <span class="article-flag-badge">
+                          <Flag size={12} /> Flagged
+                        </span>
+                      </Show>
                     </div>
 
                     <div class="article-mode-toggle">
-                      <button
-                        class={`mode-btn ${store.viewMode() === "reader" ? "active" : ""}`}
-                        onClick={() => store.setViewMode("reader")}
-                      >
-                        Reader
-                      </button>
-                      <button
-                        class={`mode-btn ${store.viewMode() === "original" ? "active" : ""}`}
-                        onClick={() => store.setViewMode("original")}
-                      >
-                        Original
-                      </button>
+                      <div class="btn-group">
+                        <button
+                          class={`mode-btn${store.viewMode() === "reader" ? " active" : ""}`}
+                          onClick={() => store.setViewMode("reader")}
+                        >
+                          Reader
+                        </button>
+                        <button
+                          class={`mode-btn${store.viewMode() === "original" ? " active" : ""}`}
+                          onClick={() => store.setViewMode("original")}
+                        >
+                          Original
+                        </button>
+                      </div>
+                      <div class="btn-group">
+                        <button
+                          class={`mode-btn${store.articleTheme() === "light" ? " active" : ""}`}
+                          onClick={() => store.setArticleTheme(store.articleTheme() === "light" ? "auto" : "light")}
+                          title="Light theme"
+                        >
+                          <Sun size={13} />
+                        </button>
+                        <button
+                          class={`mode-btn${store.articleTheme() === "dark" ? " active" : ""}`}
+                          onClick={() => store.setArticleTheme(store.articleTheme() === "dark" ? "auto" : "dark")}
+                          title="Dark theme"
+                        >
+                          <Moon size={13} />
+                        </button>
+                      </div>
+                      <div class="btn-group">
+                        <button
+                          class={`mode-btn${!store.wideMode() ? " active" : ""}`}
+                          onClick={() => store.setWideMode(false)}
+                          title="Narrow"
+                        >
+                          <Minimize2 size={13} />
+                        </button>
+                        <button
+                          class={`mode-btn${store.wideMode() ? " active" : ""}`}
+                          onClick={() => store.setWideMode(true)}
+                          title="Wide"
+                        >
+                          <Maximize2 size={13} />
+                        </button>
+                      </div>
+
+                      <Show when={store.openaiKey()}>
+                        <button
+                          class="mode-btn mode-btn-summarize"
+                          onClick={handleSummarize}
+                          disabled={summarizing()}
+                        >
+                          <Sparkles size={13} /> {summarizing() ? "Summarizing..." : "Summarize"}
+                        </button>
+                      </Show>
                     </div>
                   </div>
+
+                  {/* Summary */}
+                  <Show when={summary() || summaryError()}>
+                    <div class="summary-block">
+                      <button class="summary-toggle" onClick={() => setSummaryOpen(!summaryOpen())}>
+                        <Sparkles size={14} />
+                        <span>Summary</span>
+                        {summaryOpen() ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      </button>
+                      <Show when={summaryOpen()}>
+                        <Show when={summaryError()}>
+                          <p class="summary-error">{summaryError()}</p>
+                        </Show>
+                        <Show when={summary()}>
+                          <p class="summary-text">{summary()}</p>
+                        </Show>
+                      </Show>
+                    </div>
+                  </Show>
 
                   <hr class="article-divider" />
 

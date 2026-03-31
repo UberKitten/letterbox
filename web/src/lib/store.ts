@@ -50,6 +50,19 @@ function createStore() {
     localStorage.setItem("letterbox:wideMode", String(v));
   }
 
+  // OpenAI settings (stored in localStorage only — never sent to server)
+  const [openaiKey, _setOpenaiKey] = createSignal(localStorage.getItem("letterbox:openaiKey") || "");
+  const [openaiModel, _setOpenaiModel] = createSignal(localStorage.getItem("letterbox:openaiModel") || "gpt-4.1-mini");
+  function setOpenaiKey(v: string) {
+    _setOpenaiKey(v);
+    if (v) localStorage.setItem("letterbox:openaiKey", v);
+    else localStorage.removeItem("letterbox:openaiKey");
+  }
+  function setOpenaiModel(v: string) {
+    _setOpenaiModel(v);
+    localStorage.setItem("letterbox:openaiModel", v);
+  }
+
   // Article theme: "auto" follows system, "light"/"dark" is explicit override
   type ArticleTheme = "auto" | "light" | "dark";
   const savedArticleTheme = (localStorage.getItem("letterbox:articleTheme") || "auto") as ArticleTheme;
@@ -88,6 +101,10 @@ function createStore() {
     setWideMode,
     articleTheme,
     setArticleTheme,
+    openaiKey,
+    setOpenaiKey,
+    openaiModel,
+    setOpenaiModel,
     loading,
     setLoading,
     error,

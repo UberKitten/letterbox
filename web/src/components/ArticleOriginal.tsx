@@ -38,6 +38,12 @@ export default function ArticleOriginal(props: Props) {
     `);
     doc.close();
 
+    // Force links to open in new tab
+    doc.querySelectorAll("a").forEach((a) => {
+      a.setAttribute("target", "_blank");
+      a.setAttribute("rel", "noopener noreferrer");
+    });
+
     // Resize after content loads
     setTimeout(resizeIframe, 100);
     setTimeout(resizeIframe, 500);
@@ -47,6 +53,37 @@ export default function ArticleOriginal(props: Props) {
     images.forEach((img) => img.addEventListener("load", resizeIframe));
   });
 
+  function stripLightInlineStyles(doc: Document) {
+    doc.querySelectorAll("[style]").forEach((el) => {
+      const style = (el as HTMLElement).style;
+      // Strip light backgrounds
+      if (style.backgroundColor) {
+        style.backgroundColor = "transparent";
+      }
+      if (style.background) {
+        const bg = style.background;
+        if (/^[#\s]*[0-9a-f]{3,8}\s*(!important)?$/i.test(bg.trim()) || /^rgb/i.test(bg.trim()) || /^white/i.test(bg.trim())) {
+          style.background = "transparent";
+        }
+      }
+      // Strip dark text colors
+      if (style.color) {
+        const c = style.color;
+        const test = doc.createElement("span");
+        test.style.color = c;
+        doc.body.appendChild(test);
+        const computed = doc.defaultView?.getComputedStyle(test).color || "";
+        test.remove();
+        const match = computed.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (match) {
+          const lum = Number(match[1]) * 0.299 + Number(match[2]) * 0.587 + Number(match[3]) * 0.114;
+          if (lum <= 140) style.color = ""; // dark color — remove so it inherits light text
+        }
+      }
+    });
+    doc.querySelectorAll("[bgcolor]").forEach((el) => el.removeAttribute("bgcolor"));
+  }
+
   // Reactively update dark/light theme in iframe
   createEffect(() => {
     const doc = iframeRef?.contentDocument;
@@ -55,12 +92,11 @@ export default function ArticleOriginal(props: Props) {
     if (!style) return;
     if (props.dark) {
       style.textContent = `
-        body { background: #1a1a1a; color: #d4d4d4; }
-        * { color: inherit !important; background-color: transparent !important; border-color: #333 !important; }
-        body { background: #1a1a1a !important; }
+        body { background: #1a1a1a !important; color: #d4d4d4 !important; }
         a { color: #60a5fa !important; }
         img { background-color: unset !important; }
       `;
+      stripLightInlineStyles(doc);
     } else {
       style.textContent = `
         body { background: #ffffff; color: #1a1a1a; }
@@ -79,7 +115,7 @@ export default function ArticleOriginal(props: Props) {
     <iframe
       ref={iframeRef}
       class="article-original-frame"
-      sandbox="allow-same-origin"
+      sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
       title="Original email content"
     />
   );

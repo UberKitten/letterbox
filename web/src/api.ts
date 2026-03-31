@@ -6,7 +6,6 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
     credentials: "include",
   });
   if (res.status === 401) {
-    window.location.href = `${API_BASE}/auth/login`;
     throw new Error("Unauthorized");
   }
   if (!res.ok) {

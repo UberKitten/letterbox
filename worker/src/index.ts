@@ -20,7 +20,14 @@ authRoutes(router);
 graphRoutes(router);
 
 router.get("/health", () => Response.json({ ok: true }));
-router.all("*", () => new Response("Not Found", { status: 404 }));
+
+// Fall through to static assets for non-API routes
+router.all("*", (request: IRequest, env: Env) =>
+  env.ASSETS.fetch(new Request(request.url, {
+    method: request.method,
+    headers: request.headers,
+  })),
+);
 
 export default {
   fetch: (request: Request, env: Env, ctx: ExecutionContext) =>
