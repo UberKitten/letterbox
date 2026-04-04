@@ -117,6 +117,7 @@ button {
   right: 0;
   z-index: 100;
   transition: transform 0.3s;
+  touch-action: manipulation;
 }
 
 .header-hidden {
@@ -260,7 +261,7 @@ button {
 .reader-container {
   flex: 1;
   padding-top: var(--header-height);
-  padding-bottom: calc(var(--nav-height) + 2rem);
+  padding-bottom: calc(var(--nav-height) + 2rem + env(safe-area-inset-bottom, 0px));
 }
 
 .reader-content {
@@ -378,6 +379,7 @@ button {
   color: var(--article-text);
   padding: 1.5rem;
   border-radius: var(--radius-md);
+  max-width: 100%;
 }
 
 .article-body.article-light {
@@ -411,6 +413,22 @@ button {
   overflow-x: auto;
 }
 
+/* Reset any app class collisions inside email content */
+.article-body .header,
+.article-body .nav,
+.article-body .footer {
+  position: static;
+  z-index: auto;
+  height: auto;
+  display: block;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  transform: none;
+  transition: none;
+}
+
 .article-body table {
   max-width: 100%;
 }
@@ -431,14 +449,16 @@ button {
   bottom: 0;
   left: 0;
   right: 0;
-  height: var(--nav-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 1rem;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  height: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px));
   background: var(--color-surface);
   border-top: 1px solid var(--color-border);
   z-index: 100;
+  touch-action: manipulation;
 }
 
 .nav-group {
@@ -457,6 +477,7 @@ button {
   font-weight: 500;
   transition: all 0.15s;
   color: var(--color-text-secondary);
+  touch-action: manipulation;
 }
 
 .nav-btn svg {
@@ -513,7 +534,13 @@ button {
 }
 
 .nav-btn-flag.flagged {
-  color: var(--color-flag);
+  background: var(--color-flag);
+  color: #1a1a1a;
+}
+
+.nav-btn-flag.flagged:hover {
+  background: #d97706;
+  color: #1a1a1a;
 }
 
 .nav-position {
@@ -549,6 +576,7 @@ button {
   display: flex;
   flex-direction: column;
   animation: slideIn 0.2s ease;
+  touch-action: manipulation;
 }
 
 @keyframes fadeIn {
@@ -567,6 +595,7 @@ button {
   justify-content: space-between;
   padding: 1rem;
   border-bottom: 1px solid var(--color-border);
+  touch-action: manipulation;
 }
 
 .drawer-header h2 {
@@ -578,6 +607,7 @@ button {
   flex: 1;
   overflow-y: auto;
   padding: 0.5rem;
+  touch-action: pan-y;
 }
 
 .folder-item {

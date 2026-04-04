@@ -54,7 +54,7 @@ export default function ReaderNav(props: Props) {
             onClick={props.onToggleFlag}
             title={isFlagged() ? "Remove flag" : "Flag for later"}
           >
-            <Flag size={16} /> <span class="nav-label">{isFlagged() ? "Flagged" : "Flag"}</span>
+            <Flag size={16} fill={isFlagged() ? "currentColor" : "none"} /> <span class="nav-label">{isFlagged() ? "Unflag" : "Flag"}</span>
           </button>
 
           <button

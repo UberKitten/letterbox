@@ -44,6 +44,23 @@ export function sanitizeEmailHtml(html: string): string {
     }
   });
 
+  // Clamp fixed pixel widths on tables/cells to max-width: 100% so they reflow
+  div.querySelectorAll("table, td, th").forEach((el) => {
+    const w = el.getAttribute("width");
+    if (w && /^\d+$/.test(w) && parseInt(w) > 100) {
+      el.setAttribute("width", "100%");
+      (el as HTMLElement).style.maxWidth = `${w}px`;
+    }
+  });
+
+  // Strip position: fixed/absolute from email content — breaks out of the reader
+  div.querySelectorAll("[style]").forEach((el) => {
+    const style = (el as HTMLElement).style;
+    if (style.position === "fixed" || style.position === "absolute") {
+      style.position = "";
+    }
+  });
+
   // Force all links to open in new tab
   div.querySelectorAll("a").forEach((a) => {
     a.setAttribute("target", "_blank");

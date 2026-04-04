@@ -6,6 +6,7 @@ import {
   createSignal,
   onMount,
   onCleanup,
+  untrack,
 } from "solid-js";
 import { store } from "../lib/store";
 import {
@@ -100,7 +101,6 @@ export default function Reader() {
   const [summarizing, setSummarizing] = createSignal(false);
   const [summaryError, setSummaryError] = createSignal<string | null>(null);
   let summaryMessageId = ""; // track which message the summary is for
-  const [articleKey, setArticleKey] = createSignal(0);
   const [undoMessage, setUndoMessage] = createSignal<EmailMessage | null>(null);
   let fetchGeneration = 0;
 
@@ -153,18 +153,46 @@ export default function Reader() {
     window.scrollTo(0, saved);
   }
 
+  // Prefetch the next page of messages into the cache
+  let prefetchGen = 0;
+  function prefetch(index: number) {
+    // Don't prefetch if the next message is already cached
+    if (cache.has(index + 1)) return;
+    // Don't prefetch past the end
+    if (index + 1 >= store.totalCount()) return;
+
+    const folderIds = store.selectedFolderIds();
+    if (folderIds.length === 0) return;
+
+    const gen = ++prefetchGen;
+    getMessages({
+      folderIds,
+      skip: index + 1,
+      filter: store.statusFilter(),
+      category: store.categoryFilter(),
+    })
+      .then((res) => {
+        // Only store if we haven't changed filters/folders since
+        if (gen === prefetchGen && currentCacheKey() === cacheKey) {
+          storePage(res);
+        }
+      })
+      .catch(() => {}); // silently ignore prefetch failures
+  }
+
   // Show a message from cache instantly, or fetch if missing
   async function showMessage(index: number) {
-    saveScrollPosition();
+    untrack(saveScrollPosition);
     const key = currentCacheKey();
     if (key !== cacheKey) invalidateCache();
 
     const cached = cache.get(index);
     if (cached) {
       store.setCurrentMessage(cached);
-      setArticleKey((k) => k + 1);
+
       store.setLoading(false);
       restoreScrollPosition(cached.id);
+      prefetch(index);
       return;
     }
 
@@ -193,8 +221,9 @@ export default function Reader() {
       store.setTotalCount(ft != null ? ft : res.totalCount);
       const firstMsg = res.messages[0] || null;
       store.setCurrentMessage(firstMsg);
-      setArticleKey((k) => k + 1);
+
       if (firstMsg) restoreScrollPosition(firstMsg.id);
+      prefetch(index);
     } catch (e: any) {
       if (gen !== fetchGeneration) return;
       store.setError(e.message);
@@ -260,7 +289,7 @@ export default function Reader() {
       // Show next message instantly if cached, otherwise fetch
       if (nextMsg) {
         store.setCurrentMessage(nextMsg);
-        setArticleKey((k) => k + 1);
+  
       } else {
         showMessage(store.currentIndex());
       }
@@ -282,7 +311,7 @@ export default function Reader() {
       store.setTotalCount(store.totalCount() + 1);
       // Insert the message back and show it instantly
       store.setCurrentMessage(msg);
-      setArticleKey((k) => k + 1);
+
     }
   }
 
@@ -290,13 +319,19 @@ export default function Reader() {
     const msg = store.currentMessage();
     if (!msg) return;
     const wasFlagged = msg.flag?.flagStatus === "flagged";
+    const updated = {
+      ...msg,
+      flag: { flagStatus: wasFlagged ? "notFlagged" : "flagged" } as const,
+    };
+    // Optimistic update — show change immediately
+    store.setCurrentMessage(updated);
+    cache.set(store.currentIndex(), updated);
     try {
       await toggleFlag(msg.id, !wasFlagged);
-      store.setCurrentMessage({
-        ...msg,
-        flag: { flagStatus: wasFlagged ? "notFlagged" : "flagged" },
-      });
     } catch (e: any) {
+      // Revert on failure
+      store.setCurrentMessage(msg);
+      cache.set(store.currentIndex(), msg);
       store.setError(e.message);
     }
   }
@@ -576,6 +611,7 @@ export default function Reader() {
           >
             <Show
               when={message()}
+              keyed
               fallback={
                 <div class="empty-state">
                   <h2>You're all caught up!</h2>
@@ -584,22 +620,22 @@ export default function Reader() {
               }
             >
               {(msg) => (
-                <div class={`reader-content article-enter ${store.wideMode() ? "wide" : ""}`} style={{ "--key": articleKey() }}>
+                <div class={`reader-content article-enter ${store.wideMode() ? "wide" : ""}`}>
                   <div class="article-header">
                     <h1 class="article-title">
-                      <Show when={!msg().isRead}>
+                      <Show when={!msg.isRead}>
                         <span class="unread-dot" />
                       </Show>
-                      {msg().subject}
+                      {msg.subject}
                     </h1>
                     <div class="article-meta">
                       <span>
-                        {msg().from?.emailAddress?.name ||
-                          msg().from?.emailAddress?.address}
+                        {msg.from?.emailAddress?.name ||
+                          msg.from?.emailAddress?.address}
                       </span>
                       <span class="article-meta-dot">&middot;</span>
-                      <span>{formatDate(msg().receivedDateTime)}</span>
-                      <Show when={folderName(msg().parentFolderId)}>
+                      <span>{formatDate(msg.receivedDateTime)}</span>
+                      <Show when={folderName(msg.parentFolderId)}>
                         {(name) => (
                           <>
                             <span class="article-meta-dot">&middot;</span>
@@ -607,11 +643,11 @@ export default function Reader() {
                           </>
                         )}
                       </Show>
-                      <Show when={msg().categories?.length > 0}>
+                      <Show when={msg.categories?.length > 0}>
                         <span class="article-meta-dot">&middot;</span>
-                        <span>{msg().categories.join(", ")}</span>
+                        <span>{msg.categories.join(", ")}</span>
                       </Show>
-                      <Show when={msg().flag?.flagStatus === "flagged"}>
+                      <Show when={msg.flag?.flagStatus === "flagged"}>
                         <span class="article-flag-badge">
                           <Flag size={12} /> Flagged
                         </span>
@@ -703,13 +739,13 @@ export default function Reader() {
                     when={store.viewMode() === "reader"}
                     fallback={
                       <ArticleOriginal
-                        html={msg().body?.content || ""}
+                        html={msg.body?.content || ""}
                         dark={articleThemeClass() === "article-dark"}
                       />
                     }
                   >
                     <ArticleBody
-                      html={msg().body?.content || ""}
+                      html={msg.body?.content || ""}
                       themeClass={articleThemeClass()}
                     />
                   </Show>
