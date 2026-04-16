@@ -4,8 +4,11 @@ export async function summarizeEmail(
   subject: string,
   bodyText: string,
 ): Promise<string> {
-  // Trim body to ~12K chars to stay well within context limits
-  const trimmed = bodyText.length > 12000 ? bodyText.slice(0, 12000) + "\n[...]" : bodyText;
+  // gpt-4.1 family has 1M token context (~4M chars); gpt-4o family has 128K (~500K chars).
+  // Leave headroom for system prompt + output.
+  const maxChars = model.startsWith("gpt-4.1") ? 2_000_000 : 400_000;
+  const trimmed =
+    bodyText.length > maxChars ? bodyText.slice(0, maxChars) + "\n[...truncated]" : bodyText;
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",

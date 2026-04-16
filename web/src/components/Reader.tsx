@@ -289,7 +289,7 @@ export default function Reader() {
       // Show next message instantly if cached, otherwise fetch
       if (nextMsg) {
         store.setCurrentMessage(nextMsg);
-  
+        restoreScrollPosition(nextMsg.id);
       } else {
         showMessage(store.currentIndex());
       }
@@ -311,7 +311,7 @@ export default function Reader() {
       store.setTotalCount(store.totalCount() + 1);
       // Insert the message back and show it instantly
       store.setCurrentMessage(msg);
-
+      restoreScrollPosition(msg.id);
     }
   }
 
