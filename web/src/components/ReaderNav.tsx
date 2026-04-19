@@ -36,16 +36,8 @@ export default function ReaderNav(props: Props) {
         </button>
       </div>
 
-      <div class="nav-group nav-group-right">
-        <Show when={message()}>
-          <button
-            class={`nav-btn nav-btn-flag ${isFlagged() ? "flagged" : ""}`}
-            onClick={props.onToggleFlag}
-            title={isFlagged() ? "Remove flag" : "Flag for later"}
-          >
-            <Flag size={18} fill={isFlagged() ? "currentColor" : "none"} /> <span class="nav-label">{isFlagged() ? "Unflag" : "Flag"}</span>
-          </button>
-
+      <Show when={message()}>
+        <div class="nav-group nav-group-center">
           <button
             class="nav-btn nav-btn-undo"
             disabled={!props.undoPending}
@@ -61,8 +53,18 @@ export default function ReaderNav(props: Props) {
           >
             <Check size={18} /> <span class="nav-label">{message()?.isRead ? "Read" : "Mark read"}</span>
           </button>
-        </Show>
-      </div>
+        </div>
+
+        <div class="nav-group nav-group-right">
+          <button
+            class={`nav-btn nav-btn-flag ${isFlagged() ? "flagged" : ""}`}
+            onClick={props.onToggleFlag}
+            title={isFlagged() ? "Remove flag" : "Flag for later"}
+          >
+            <Flag size={18} fill={isFlagged() ? "currentColor" : "none"} /> <span class="nav-label">{isFlagged() ? "Unflag" : "Flag"}</span>
+          </button>
+        </div>
+      </Show>
     </nav>
   );
 }
