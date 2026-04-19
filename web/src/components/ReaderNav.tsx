@@ -17,13 +17,13 @@ export default function ReaderNav(props: Props) {
 
   return (
     <nav class="reader-nav">
-      <div class="nav-group">
+      <div class="nav-group nav-group-left">
         <button
           class="nav-btn"
           disabled={store.currentIndex() <= 0 || store.loading()}
           onClick={props.onPrev}
         >
-          <ChevronLeft size={18} />
+          <ChevronLeft size={20} />
         </button>
         <button
           class="nav-btn"
@@ -32,29 +32,18 @@ export default function ReaderNav(props: Props) {
           }
           onClick={props.onNext}
         >
-          <ChevronRight size={18} />
+          <ChevronRight size={20} />
         </button>
       </div>
 
-      <div class="nav-group">
-        <span class="nav-position">
-          <Show
-            when={store.totalCount() > 0}
-            fallback="No posts"
-          >
-            {store.currentIndex() + 1} of {store.totalCount()}
-          </Show>
-        </span>
-      </div>
-
-      <div class="nav-group">
+      <div class="nav-group nav-group-right">
         <Show when={message()}>
           <button
             class={`nav-btn nav-btn-flag ${isFlagged() ? "flagged" : ""}`}
             onClick={props.onToggleFlag}
             title={isFlagged() ? "Remove flag" : "Flag for later"}
           >
-            <Flag size={16} fill={isFlagged() ? "currentColor" : "none"} /> <span class="nav-label">{isFlagged() ? "Unflag" : "Flag"}</span>
+            <Flag size={18} fill={isFlagged() ? "currentColor" : "none"} /> <span class="nav-label">{isFlagged() ? "Unflag" : "Flag"}</span>
           </button>
 
           <button
@@ -62,7 +51,7 @@ export default function ReaderNav(props: Props) {
             disabled={!props.undoPending}
             onClick={props.onUndo}
           >
-            <Undo2 size={16} /> <span class="nav-label">Undo</span>
+            <Undo2 size={18} /> <span class="nav-label">Undo</span>
           </button>
 
           <button
@@ -70,7 +59,7 @@ export default function ReaderNav(props: Props) {
             onClick={message()?.isRead ? props.onNext : props.onMarkRead}
             title={message()?.isRead ? "Next" : "Mark as read"}
           >
-            <Check size={16} /> <span class="nav-label">{message()?.isRead ? "Read" : "Mark read"}</span>
+            <Check size={18} /> <span class="nav-label">{message()?.isRead ? "Read" : "Mark read"}</span>
           </button>
         </Show>
       </div>

@@ -519,6 +519,11 @@ export default function Reader() {
         </div>
 
         <div class="header-actions">
+          <Show when={store.totalCount() > 0}>
+            <span class="header-position">
+              {store.currentIndex() + 1} of {store.totalCount()}
+            </span>
+          </Show>
           <div class="user-menu">
             <button
               class="user-btn"
@@ -610,7 +615,7 @@ export default function Reader() {
             }
           >
             <Show
-              when={message()}
+              when={message()?.id}
               keyed
               fallback={
                 <div class="empty-state">
@@ -619,23 +624,25 @@ export default function Reader() {
                 </div>
               }
             >
-              {(msg) => (
+              {(_id) => {
+                const msg = () => message()!;
+                return (
                 <div class={`reader-content article-enter ${store.wideMode() ? "wide" : ""}`}>
                   <div class="article-header">
                     <h1 class="article-title">
-                      <Show when={!msg.isRead}>
+                      <Show when={!msg().isRead}>
                         <span class="unread-dot" />
                       </Show>
-                      {msg.subject}
+                      {msg().subject}
                     </h1>
                     <div class="article-meta">
                       <span>
-                        {msg.from?.emailAddress?.name ||
-                          msg.from?.emailAddress?.address}
+                        {msg().from?.emailAddress?.name ||
+                          msg().from?.emailAddress?.address}
                       </span>
                       <span class="article-meta-dot">&middot;</span>
-                      <span>{formatDate(msg.receivedDateTime)}</span>
-                      <Show when={folderName(msg.parentFolderId)}>
+                      <span>{formatDate(msg().receivedDateTime)}</span>
+                      <Show when={folderName(msg().parentFolderId)}>
                         {(name) => (
                           <>
                             <span class="article-meta-dot">&middot;</span>
@@ -643,11 +650,11 @@ export default function Reader() {
                           </>
                         )}
                       </Show>
-                      <Show when={msg.categories?.length > 0}>
+                      <Show when={msg().categories?.length > 0}>
                         <span class="article-meta-dot">&middot;</span>
-                        <span>{msg.categories.join(", ")}</span>
+                        <span>{msg().categories.join(", ")}</span>
                       </Show>
-                      <Show when={msg.flag?.flagStatus === "flagged"}>
+                      <Show when={msg().flag?.flagStatus === "flagged"}>
                         <span class="article-flag-badge">
                           <Flag size={12} /> Flagged
                         </span>
@@ -739,18 +746,19 @@ export default function Reader() {
                     when={store.viewMode() === "reader"}
                     fallback={
                       <ArticleOriginal
-                        html={msg.body?.content || ""}
+                        html={msg().body?.content || ""}
                         dark={articleThemeClass() === "article-dark"}
                       />
                     }
                   >
                     <ArticleBody
-                      html={msg.body?.content || ""}
+                      html={msg().body?.content || ""}
                       themeClass={articleThemeClass()}
                     />
                   </Show>
                 </div>
-              )}
+                );
+              }}
             </Show>
           </Show>
         </Show>
